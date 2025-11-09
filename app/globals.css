@@ -1,26 +1,112 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-root: #000000;
+  --bg-surface: #060606;
+  --bg-elevated: #0c0c0c;
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+  --accent: #4f8cff;
+  --accent-soft: rgba(79, 140, 255, 0.25);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-root);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+#__next {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 사이드바 고정 */
+aside {
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* 메인 콘텐츠 */
+main {
+  min-width: 0 !important;
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* 마크다운 */
+.prose {
+  color: var(--text-primary);
+}
+
+.prose code {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  padding: 0.28rem 0.5rem;
+  border-radius: 0.45rem;
+  font-size: 0.9em;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.prose pre {
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  padding: 1.1rem;
+  overflow-x: auto;
+  color: var(--text-primary);
+}
+
+.prose a {
+  color: #8cb9ff;
+}
+
+.prose a:hover {
+  color: #bfd5ff;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prose p,
+.prose li {
+  color: #ffffff;
+  line-height: 1.8;
 }
