@@ -5,13 +5,14 @@
 @tailwind utilities;
 
 :root {
-  --bg-root: #000000;
-  --bg-surface: #060606;
-  --bg-elevated: #0c0c0c;
-  --text-primary: #ffffff;
-  --text-secondary: #ffffff;
-  --accent: #4f8cff;
-  --accent-soft: rgba(79, 140, 255, 0.25);
+  --bg-root: #f4f4f6;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f0f2;
+  --text-primary: #1f1f24;
+  --text-secondary: #4f4f58;
+  --accent: #2f2f33;
+  --accent-soft: rgba(47, 47, 51, 0.14);
+  --radius-card: 22px;
 }
 
 html,
@@ -25,6 +26,10 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+body * {
+  word-break: break-word;
+}
+
 #__next {
   height: 100%;
   display: flex;
@@ -33,9 +38,9 @@ body {
 
 /* 사이드바 고정 */
 aside {
-  width: 240px !important;
-  min-width: 240px !important;
-  max-width: 240px !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
   flex-shrink: 0 !important;
   flex-grow: 0 !important;
 }
@@ -61,7 +66,7 @@ main {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.6);
 }
 
 /* 마크다운 */
@@ -70,17 +75,17 @@ main {
 }
 
 .prose code {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background-color: rgba(72, 100, 255, 0.08);
+  color: #1b1d2c;
   padding: 0.28rem 0.5rem;
   border-radius: 0.45rem;
   font-size: 0.9em;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(72, 100, 255, 0.18);
 }
 
 .prose pre {
-  background: rgba(10, 10, 10, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #f4f6ff;
+  border: 1px solid rgba(72, 100, 255, 0.15);
   border-radius: 0.75rem;
   padding: 1.1rem;
   overflow-x: auto;
@@ -88,11 +93,11 @@ main {
 }
 
 .prose a {
-  color: #8cb9ff;
+  color: #3a55ff;
 }
 
 .prose a:hover {
-  color: #bfd5ff;
+  color: #233df0;
 }
 
 .prose h1,
@@ -107,6 +112,6 @@ main {
 
 .prose p,
 .prose li {
-  color: #ffffff;
+  color: #2c2f3f;
   line-height: 1.8;
 }

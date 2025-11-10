@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
+import RightSidebar from "@/components/RightSidebar";
 import { useThreadStore } from "@/store/threadStore";
 import {
   createLangGraphClient,
@@ -17,6 +18,46 @@ import {
 } from "@/lib/langgraph";
 import type { Message } from "@/lib/langgraph";
 import { Client } from "@langchain/langgraph-sdk";
+
+const extractUrlsFromText = (text: string): string[] => {
+  if (!text) return [];
+  const urlRegex = /https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+/gi;
+  const matches = text.match(urlRegex);
+  return matches ? Array.from(new Set(matches)) : [];
+};
+
+const quickPrompts = [
+  {
+    title: "What are the advantages",
+    description: "of using Assistant Cloud?",
+    message:
+      "What are the advantages of using Assistant Cloud? Please highlight key differentiators.",
+  },
+  {
+    title: "Write code to",
+    description: "demonstrate topological sorting",
+    message:
+      "Can you write TypeScript code that demonstrates topological sorting with a DAG example?",
+  },
+  {
+    title: "Help me write an essay",
+    description: "about AI chat applications",
+    message:
+      "Help me write an essay about modern AI chat applications and their key capabilities.",
+  },
+  {
+    title: "What is the weather",
+    description: "in San Francisco?",
+    message:
+      "What's the current weather in San Francisco? Include temperature and conditions.",
+  },
+];
+
+type ActivityEvent = {
+  type: "user" | "assistant" | "log";
+  content: string;
+  timestamp: string;
+};
 
 export default function Home() {
   const {
@@ -47,6 +88,8 @@ export default function Home() {
   const [client, setClient] = useState<Client | null>(null);
   const [processLogs, setProcessLogs] = useState<string[]>([]);
   const [showProcessLogs, setShowProcessLogs] = useState(false);
+  const [activityEvents, setActivityEvents] = useState<Record<string, ActivityEvent[]>>({});
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
 
   useEffect(() => {
     const apiKeyToUse =
@@ -108,6 +151,19 @@ export default function Home() {
               message_count: formattedMessages.length,
               messages: formattedMessages,
             });
+
+            setActivityEvents((prev) => {
+              if (prev[serverThreadId]) return prev;
+              const events = formattedMessages.map((message) => ({
+                type: message.role,
+                content: message.content,
+                timestamp: new Date().toISOString(),
+              } as ActivityEvent));
+              return {
+                ...prev,
+                [serverThreadId]: events,
+              };
+            });
           }
         }
 
@@ -151,6 +207,11 @@ export default function Home() {
           message_count: 0,
           messages: [],
         });
+        setActivityEvents((prev) => ({
+          ...prev,
+          [newThreadId]: [],
+        }));
+        setMessages([]);
       } catch (error) {
         console.error("Failed to create new thread:", error);
       } finally {
@@ -226,6 +287,21 @@ export default function Home() {
     const userMessage = { role: "user" as const, content: message };
     addMessage(userMessage);
     updateThreadMetadata(threadId, "user", message);
+
+    setActivityEvents((prev) => {
+      const prevEvents = prev[threadId] ?? [];
+      return {
+        ...prev,
+        [threadId]: [
+          ...prevEvents,
+          {
+            type: "user",
+            content: message,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+    });
 
     setIsStreaming(true);
     setProcessLogs([]);
@@ -319,12 +395,28 @@ export default function Home() {
                 for (const [nodeName, nodeData] of Object.entries(data)) {
                   if (nodeName === "__start__") continue;
 
-                  const timestamp = new Date().toLocaleTimeString("ko-KR", {
+                  const timestamp = new Date().toISOString();
+                  const readableTime = new Date(timestamp).toLocaleTimeString("ko-KR", {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",
                   });
-                  logs.push(`[${timestamp}] 🔹 **${nodeName}** 실행`);
+                  const logEntry = `[${readableTime}] 🔹 **${nodeName}** 실행`;
+                  logs.push(logEntry);
+                  setActivityEvents((prev) => {
+                    const prevEvents = prev[threadId] ?? [];
+                    return {
+                      ...prev,
+                      [threadId]: [
+                        ...prevEvents,
+                        {
+                          type: "log",
+                          content: logEntry,
+                          timestamp,
+                        },
+                      ],
+                    };
+                  });
 
                   if (
                     typeof nodeData === "object" &&
@@ -335,9 +427,22 @@ export default function Home() {
                     if (report) {
                       fullResponse = String(report);
                       if (nodeName === "final_report_generation") {
-                        logs.push(
-                          `  ✅ 최종 리포트: ${String(report).length} 글자`
-                        );
+                        const reportLog = `  ✅ 최종 리포트: ${String(report).length} 글자`;
+                        logs.push(reportLog);
+                        setActivityEvents((prev) => {
+                          const prevEvents = prev[threadId] ?? [];
+                          return {
+                            ...prev,
+                            [threadId]: [
+                              ...prevEvents,
+                              {
+                                type: "log",
+                                content: reportLog,
+                                timestamp: new Date().toISOString(),
+                              },
+                            ],
+                          };
+                        });
                       }
                     }
                   }
@@ -357,13 +462,55 @@ export default function Home() {
       if (fullResponse) {
         updateLastAssistantMessage(fullResponse);
         updateThreadMetadata(threadId, "assistant", fullResponse);
+        setActivityEvents((prev) => {
+          const prevEvents = prev[threadId] ?? [];
+          return {
+            ...prev,
+            [threadId]: [
+              ...prevEvents,
+              {
+                type: "assistant",
+                content: fullResponse,
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        });
       } else {
         const fallbackResponse = await fetchFinalAssistantResponse();
         if (fallbackResponse) {
           updateLastAssistantMessage(fallbackResponse);
           updateThreadMetadata(threadId, "assistant", fallbackResponse);
+          setActivityEvents((prev) => {
+            const prevEvents = prev[threadId] ?? [];
+            return {
+              ...prev,
+              [threadId]: [
+                ...prevEvents,
+                {
+                  type: "assistant",
+                  content: fallbackResponse,
+                  timestamp: new Date().toISOString(),
+                },
+              ],
+            };
+          });
         } else {
           updateLastAssistantMessage("응답을 불러오지 못했습니다.");
+          setActivityEvents((prev) => {
+            const prevEvents = prev[threadId] ?? [];
+            return {
+              ...prev,
+              [threadId]: [
+                ...prevEvents,
+                {
+                  type: "assistant",
+                  content: "응답을 불러오지 못했습니다.",
+                  timestamp: new Date().toISOString(),
+                },
+              ],
+            };
+          });
         }
       }
     } catch (error) {
@@ -373,8 +520,36 @@ export default function Home() {
       if (fallbackResponse) {
         updateLastAssistantMessage(fallbackResponse);
         updateThreadMetadata(threadId, "assistant", fallbackResponse);
+        setActivityEvents((prev) => {
+          const prevEvents = prev[threadId] ?? [];
+          return {
+            ...prev,
+            [threadId]: [
+              ...prevEvents,
+              {
+                type: "assistant",
+                content: fallbackResponse,
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        });
       } else {
         updateLastAssistantMessage("응답을 불러오지 못했습니다.");
+        setActivityEvents((prev) => {
+          const prevEvents = prev[threadId] ?? [];
+          return {
+            ...prev,
+            [threadId]: [
+              ...prevEvents,
+              {
+                type: "assistant",
+                content: "응답을 불러오지 못했습니다.",
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        });
       }
     } finally {
       setIsStreaming(false);
@@ -408,7 +583,10 @@ export default function Home() {
         message_count: 0,
         messages: [],
       });
-      setMessages([]);
+      setActivityEvents((prev) => ({
+        ...prev,
+        [newThreadId]: [],
+      }));
     } catch (error) {
       console.error("새 스레드 생성 중 오류:", error);
     } finally {
@@ -416,84 +594,132 @@ export default function Home() {
     }
   };
 
+  const assistantMessages = messages.filter((m) => m.role === "assistant");
+  const latestAssistantMessage =
+    assistantMessages.length > 0
+      ? assistantMessages[assistantMessages.length - 1]
+      : null;
+  const referenceLinks = latestAssistantMessage
+    ? extractUrlsFromText(latestAssistantMessage.content).map((url) => ({ url }))
+    : [];
+  const activityFeed = messages.map((message) => ({
+    type: message.role,
+    content: message.content,
+    timestamp: new Date().toISOString(),
+  }));
+  const currentActivityEvents = threadId
+    ? activityEvents[threadId] ?? activityFeed
+    : [];
+
+  const handleQuickPrompt = (prompt: string) => {
+    if (isStreaming || isLoading) return;
+    handleSendMessage(prompt);
+  };
+
   return (
-    <div className="h-screen overflow-hidden flex bg-black text-white">
+    <div className="h-screen overflow-hidden flex bg-[var(--bg-root)] text-[var(--text-primary)]">
       <Sidebar onNewThread={handleNewThreadClick} />
       <div className="flex-1 flex flex-col bg-transparent min-w-0 min-h-0">
-        <header className="border-b border-white/12 bg-black flex-shrink-0">
-          <div className="max-w-3xl mx-auto w-full px-6 py-5 flex items-center justify-between gap-6">
-            <div className="space-y-1">
-              <span className="text-[11px] uppercase tracking-[0.35em] text-white/70">
+        <header className="border-b border-[#e0e4f6] bg-white flex-shrink-0 shadow-sm">
+          <div className="max-w-4xl mx-auto w-full px-8 py-6 flex items-center justify-between gap-4">
+            <div className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.5em] text-[#8a8a94]">
                 Research Agent
               </span>
-              <h1 className="text-2xl font-semibold text-white">AI Research Agent</h1>
-              <p className="text-sm text-white leading-6">
-                LangGraph 기반 심층 리서치를 돕는 대화형 워크스페이스
+              <h1 className="text-[2.15rem] font-semibold text-[var(--text-primary)] tracking-tight">
+                AI Research Agent
+              </h1>
+              <p className="text-[15px] text-[#60606a] leading-6">
+                LangGraph 기반 심층 리서치를 돕는 정교한 워크스페이스
               </p>
             </div>
-            <button className="hidden sm:inline-flex items-center justify-center bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg border border-white/20 text-sm font-semibold transition-colors">
-              Plus 사용하기
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsRightSidebarOpen((prev) => !prev)}
+                aria-label="Toggle insights"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[#d4d4da] shadow-sm transition-colors ${
+                  isRightSidebarOpen
+                    ? "bg-[#f0f0f3] text-[var(--text-primary)] hover:bg-[#e4e4e9]"
+                    : "bg-white text-[var(--text-primary)] hover:bg-[#f0f0f3]"
+                }`}
+              >
+                {isRightSidebarOpen ? "−" : "+"}
+              </button>
+            </div>
           </div>
         </header>
-
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-root)] px-12 md:px-20 lg:px-28 xl:px-36 py-10">
           {messages.length > 0 ? (
-            <div>
+            <div className="space-y-5">
               {messages.map((message, index) => (
                 <ChatMessage key={index} message={message} />
               ))}
-              {isStreaming && (
-                <div className="py-6">
-                  <div className="max-w-3xl mx-auto px-6">
-                    <div className="text-white/70">생성 중...</div>
+              {isStreaming && <div className="text-[#6b7195] px-4">생성 중...</div>}
+              {showProcessLogs && processLogs.length > 0 && (
+                <div className="bg-[var(--bg-surface)] border border-[#dfe0e6] rounded-[26px] shadow-lg">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#e0e4f6]">
+                    <h3 className="text-[var(--text-primary)] font-semibold text-sm tracking-wide">
+                      🔄 처리 과정
+                    </h3>
+                    <button
+                      onClick={() => setShowProcessLogs(false)}
+                      className="text-[#6f6f78] hover:text-[var(--text-primary)] text-sm"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  <div className="text-sm text-[#5f5f68] space-y-1 max-h-56 overflow-y-auto px-5 py-4">
+                    {processLogs.slice(-20).map((log, index) => (
+                      <div key={index}>{log}</div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex flex-col justify-center h-full px-6">
-              <div className="max-w-3xl w-full mx-auto space-y-8">
-                <div className="space-y-3">
-                  <h2 className="text-3xl md:text-4xl font-semibold text-white">
-                    오늘은 어떤 리서치를 도와드릴까요?
-                  </h2>
-                  <p className="text-white/80 text-base leading-relaxed">
-                    궁금한 주제를 물어보거나, 분석이 필요한 데이터를 설명하세요. LangGraph가 심층 리포트를 도와드립니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showProcessLogs && processLogs.length > 0 && (
-            <div className="max-w-3xl mx-auto px-6 mt-6">
-              <div className="bg-black border border-white/20 rounded-2xl">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/15">
-                  <h3 className="text-white font-semibold text-sm tracking-wide">
-                    🔄 처리 과정
-                  </h3>
-                  <button
-                    onClick={() => setShowProcessLogs(false)}
-                    className="text-white/70 hover:text-white text-sm"
-                  >
-                    닫기
-                  </button>
-                </div>
-                <div className="text-sm text-white/80 space-y-1 max-h-56 overflow-y-auto px-5 py-4">
-                  {processLogs.slice(-20).map((log, index) => (
-                    <div key={index}>{log}</div>
-                  ))}
-                </div>
-              </div>
+            <div className="flex flex-1 flex-col items-center justify-center px-4 text-center space-y-6">
+              <h2 className="text-[30px] md:text-[34px] font-semibold text-[var(--text-primary)]">
+                Ready to dive deep?
+              </h2>
+              <p className="text-[#838389] text-lg leading-relaxed">
+                What would you like to research?
+              </p>
             </div>
           )}
         </main>
-
-        <div className="flex-shrink-0">
-          <ChatInput onSend={handleSendMessage} disabled={isStreaming || isLoading} />
+        <div className="flex-shrink-0 bg-[var(--bg-root)] px-6 md:px-12 lg:px-20 xl:px-28 pb-12">
+          <div className="max-w-2xl mx-auto w-full space-y-6">
+            {messages.length === 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt.title}
+                    onClick={() => handleQuickPrompt(prompt.message)}
+                    className="text-left bg-white border border-[#dfe0e6] hover:border-[var(--accent)]/45 hover:shadow-lg transition-all rounded-[22px] px-5 py-4 shadow-sm"
+                  >
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">
+                      {prompt.title}
+                    </div>
+                    <div className="text-xs text-[#7c7c85] mt-1">
+                      {prompt.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <ChatInput onSend={handleSendMessage} disabled={isStreaming || isLoading} />
+          </div>
         </div>
       </div>
+      {isRightSidebarOpen && (
+        <div className="flex-shrink-0 border-l border-[#dcdce2] bg-white">
+          <RightSidebar
+            references={referenceLinks}
+            activity={currentActivityEvents}
+            processLogs={processLogs}
+          />
+        </div>
+      )}
     </div>
   );
 }

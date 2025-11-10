@@ -26,16 +26,24 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="w-full bg-black border-t border-white/15 px-6 py-5">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-3 bg-black border border-white/20 rounded-2xl p-4 shadow-[0_18px_45px_-30px_rgba(0,0,0,0.75)] focus-within:border-white/70 focus-within:ring-2 focus-within:ring-white/30 transition-all">
+    <div className="w-full">
+      <div className="rounded-[34px] border border-[#d6d6dc] bg-white shadow-[0_18px_45px_-32px_rgba(20,20,20,0.25)] p-5 transition-all focus-within:border-[var(--accent)]/35 focus-within:ring-2 focus-within:ring-[var(--accent)]/12">
+        <div className="flex items-end gap-3">
+          <button
+            type="button"
+            className="h-9 w-9 flex items-center justify-center rounded-full border border-[#d4d4da] text-[var(--text-primary)] bg-[#f5f5f7]"
+            disabled
+            aria-label="Add attachment"
+          >
+            +
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message AI Research Agent..."
+            placeholder="Send a message..."
             disabled={disabled}
-            className="flex-1 bg-transparent text-white placeholder-white/50 caret-white resize-none outline-none px-1 py-1 min-h-[24px] max-h-[200px] text-[15px] leading-relaxed font-medium"
+            className="flex-1 bg-transparent text-[var(--text-primary)] placeholder-[#9a9aa3] caret-[var(--accent)] resize-none outline-none min-h-[36px] max-h-[200px] text-[15px] leading-relaxed"
             rows={1}
             style={{
               height: "auto",
@@ -49,7 +57,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           <button
             onClick={handleSend}
             disabled={disabled || !input.trim()}
-            className="bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl transition-all flex-shrink-0 shadow-lg shadow-white/20"
+            className="flex items-center justify-center rounded-full h-9 w-9 border border-[#d4d4da] bg-[#f0f0f3] text-[var(--text-primary)] hover:bg-[#e5e5ea] disabled:bg-[#ececef] disabled:text-[#a5a5ad]"
+            aria-label="Send message"
           >
             <Send className="w-4 h-4" />
           </button>
