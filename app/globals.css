@@ -34,6 +34,7 @@
   --input-border: #d9ddf6;
   --input-icon-bg: #f0f2ff;
   --input-icon-border: #d9ddf6;
+  --input-field-bg: #e8e9ed;
   --radius-card: 22px;
 }
 
@@ -66,6 +67,7 @@ body[data-theme="light"] {
   --input-border: #d9ddf6;
   --input-icon-bg: #f0f2ff;
   --input-icon-border: #d9ddf6;
+  --input-field-bg: #e8e9ed;
 }
 
 body[data-theme="dark"] {
@@ -97,6 +99,7 @@ body[data-theme="dark"] {
   --input-border: #1d212d;
   --input-icon-bg: #181b24;
   --input-icon-border: #232837;
+  --input-field-bg: #4f4f4f;
 }
 
 html,
@@ -192,4 +195,9 @@ body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
 .prose li {
   color: var(--text-secondary);
   line-height: 1.8;
+}
+
+/* ChatInput placeholder 왼쪽 정렬 */
+textarea::placeholder {
+  text-align: left;
 }

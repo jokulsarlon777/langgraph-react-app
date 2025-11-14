@@ -823,7 +823,7 @@ export default function Home() {
               <div className="flex-1 min-h-0 overflow-y-auto px-12 md:px-20 lg:px-28 xl:px-36 pt-10 pb-32">
                 <ResearchReport data={reportData} />
               </div>
-              <div className="flex-shrink-0 bg-[var(--bg-surface)] px-6 md:px-12 lg:px-20 xl:px-28 pt-20 pb-24 border-t-2 border-[var(--panel-border)] shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.12)]">
+              <div className="flex-shrink-0 bg-[var(--bg-root)] px-6 md:px-12 lg:px-20 xl:px-28 pt-20 pb-24">
                 <div className="max-w-2xl mx-auto w-full">
                   <ChatInput
                     onSend={handleSendMessage}

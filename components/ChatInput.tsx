@@ -29,8 +29,8 @@ export default function ChatInput({ onSend, onDeepResearch, disabled }: ChatInpu
   return (
     <div className="w-full">
       <div 
-        className="flex items-center rounded-[30px] bg-[#4f4f4f] pr-6 py-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.7)] transition-all focus-within:shadow-[0_24px_54px_-28px_rgba(20,20,35,0.85)]"
-        style={{ border: "none", outline: "none" }}
+        className="flex items-center rounded-[30px] pl-6 pr-6 py-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.7)] transition-all focus-within:shadow-[0_24px_54px_-28px_rgba(20,20,35,0.85)]"
+        style={{ border: "none", outline: "none", backgroundColor: "var(--input-field-bg)" }}
       >
         <textarea
           value={input}
@@ -38,17 +38,23 @@ export default function ChatInput({ onSend, onDeepResearch, disabled }: ChatInpu
           onKeyDown={handleKeyDown}
           placeholder="무엇이든 물어보세요"
           disabled={disabled}
-          className={`flex-1 bg-transparent text-[#f5f6f8] placeholder-[#80818b] caret-[var(--accent)] resize-none outline-none border-0 min-h-[44px] max-h-[220px] text-[16px] ${!input.trim() ? 'text-center' : 'text-left'}`}
+          className="flex-1 bg-transparent text-[#f5f6f8] placeholder-[#80818b] placeholder:text-left caret-[var(--accent)] resize-none outline-none border-0 min-h-[44px] max-h-[220px] text-[16px] text-left"
           rows={1}
           style={{
             height: "44px",
             lineHeight: "44px",
             padding: "0",
+            paddingLeft: "16px",
             paddingRight: "12px",
             verticalAlign: "middle",
             border: "none",
             outline: "none",
             boxShadow: "none",
+            textAlign: "left",
+          }}
+          onFocus={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.textAlign = "left";
           }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
@@ -65,10 +71,11 @@ export default function ChatInput({ onSend, onDeepResearch, disabled }: ChatInpu
         <button
           onClick={handleSend}
           disabled={disabled || !input.trim()}
-          className="flex-shrink-0 h-11 w-11 ml-3 flex items-center justify-center rounded-full bg-gradient-to-b from-[#5c5e68] to-[#3f4048] text-white hover:from-[var(--accent)] hover:to-[var(--accent)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:from-[#34353b] disabled:to-[#34353b] disabled:text-[#8a8c95]"
+          className="flex-shrink-0 ml-3 flex items-center justify-center rounded-full bg-gradient-to-b from-[#9ca3af] to-[#6b7280] text-white hover:from-[var(--accent)] hover:to-[var(--accent)] transition-all focus:outline-none disabled:from-[#d1d5db] disabled:to-[#d1d5db] disabled:text-[#9ca3af] border-0"
+          style={{ width: "35px", height: "35px", aspectRatio: "1/1", border: "none", outline: "none" }}
           aria-label="Send message"
         >
-          <ArrowUp className="w-4 h-4" />
+          <ArrowUp className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
