@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onDeepResearch?: (message: string) => void;
   disabled?: boolean;
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, onDeepResearch, disabled }: ChatInputProps) {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -27,42 +28,48 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   return (
     <div className="w-full">
-      <div className="rounded-[34px] border border-[#d6d6dc] bg-white shadow-[0_18px_45px_-32px_rgba(20,20,20,0.25)] p-5 transition-all focus-within:border-[var(--accent)]/35 focus-within:ring-2 focus-within:ring-[var(--accent)]/12">
-        <div className="flex items-end gap-3">
-          <button
-            type="button"
-            className="h-9 w-9 flex items-center justify-center rounded-full border border-[#d4d4da] text-[var(--text-primary)] bg-[#f5f5f7]"
-            disabled
-            aria-label="Add attachment"
-          >
-            +
-          </button>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Send a message..."
-            disabled={disabled}
-            className="flex-1 bg-transparent text-[var(--text-primary)] placeholder-[#9a9aa3] caret-[var(--accent)] resize-none outline-none min-h-[36px] max-h-[200px] text-[15px] leading-relaxed"
-            rows={1}
-            style={{
-              height: "auto",
-            }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = "auto";
-              target.style.height = `${target.scrollHeight}px`;
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={disabled || !input.trim()}
-            className="flex items-center justify-center rounded-full h-9 w-9 border border-[#d4d4da] bg-[#f0f0f3] text-[var(--text-primary)] hover:bg-[#e5e5ea] disabled:bg-[#ececef] disabled:text-[#a5a5ad]"
-            aria-label="Send message"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
+      <div 
+        className="flex items-center rounded-[30px] bg-[#4f4f4f] pr-6 py-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.7)] transition-all focus-within:shadow-[0_24px_54px_-28px_rgba(20,20,35,0.85)]"
+        style={{ border: "none", outline: "none" }}
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="무엇이든 물어보세요"
+          disabled={disabled}
+          className={`flex-1 bg-transparent text-[#f5f6f8] placeholder-[#80818b] caret-[var(--accent)] resize-none outline-none border-0 min-h-[44px] max-h-[220px] text-[16px] ${!input.trim() ? 'text-center' : 'text-left'}`}
+          rows={1}
+          style={{
+            height: "44px",
+            lineHeight: "44px",
+            padding: "0",
+            paddingRight: "12px",
+            verticalAlign: "middle",
+            border: "none",
+            outline: "none",
+            boxShadow: "none",
+          }}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = "auto";
+            const newHeight = Math.min(Math.max(target.scrollHeight, 44), 220);
+            target.style.height = `${newHeight}px`;
+            if (newHeight === 44) {
+              target.style.lineHeight = "44px";
+            } else {
+              target.style.lineHeight = "1.5";
+            }
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={disabled || !input.trim()}
+          className="flex-shrink-0 h-11 w-11 ml-3 flex items-center justify-center rounded-full bg-gradient-to-b from-[#5c5e68] to-[#3f4048] text-white hover:from-[var(--accent)] hover:to-[var(--accent)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:from-[#34353b] disabled:to-[#34353b] disabled:text-[#8a8c95]"
+          aria-label="Send message"
+        >
+          <ArrowUp className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

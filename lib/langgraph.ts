@@ -15,6 +15,8 @@ export interface ThreadMetadata {
 export interface Message {
   role: "user" | "assistant";
   content: string;
+  timestamp?: string;
+  tags?: string[];
 }
 
 export interface Thread {
@@ -73,11 +75,28 @@ export async function loadThreadMessages(
       if (typeof msg === "object" && msg !== null) {
         const role = msg.type || msg.role || "";
         const content = msg.content || "";
+        const createdAt =
+          (msg.created_at as string | undefined) ||
+          (msg.timestamp as string | undefined) ||
+          new Date().toISOString();
+        const tags = Array.isArray((msg as any).tags)
+          ? ((msg as any).tags as string[])
+          : undefined;
 
         if (role.toLowerCase().includes("human") || role.toLowerCase().includes("user")) {
-          formattedMessages.push({ role: "user", content: String(content) });
+          formattedMessages.push({
+            role: "user",
+            content: String(content),
+            timestamp: createdAt,
+            tags,
+          });
         } else if (role.toLowerCase().includes("ai") || role.toLowerCase().includes("assistant")) {
-          formattedMessages.push({ role: "assistant", content: String(content) });
+          formattedMessages.push({
+            role: "assistant",
+            content: String(content),
+            timestamp: createdAt,
+            tags,
+          });
         }
       }
     }

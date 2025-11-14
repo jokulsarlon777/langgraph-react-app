@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import RightSidebar from "@/components/RightSidebar";
 import { useThreadStore } from "@/store/threadStore";
@@ -18,40 +17,78 @@ import {
 } from "@/lib/langgraph";
 import type { Message } from "@/lib/langgraph";
 import { Client } from "@langchain/langgraph-sdk";
+import ResearchReport from "@/components/ResearchReport/ResearchReport";
+import type {
+  ReportSectionData,
+  ReportSource,
+} from "@/components/ResearchReport/types";
 
 const extractUrlsFromText = (text: string): string[] => {
   if (!text) return [];
-  const urlRegex = /https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+/gi;
+  const urlRegex = /https?:\/\/[\w\-._~:\/?#\[\]@!$&'()*+,;=%]+/gi;
   const matches = text.match(urlRegex);
   return matches ? Array.from(new Set(matches)) : [];
 };
 
-const quickPrompts = [
-  {
-    title: "What are the advantages",
-    description: "of using Assistant Cloud?",
-    message:
-      "What are the advantages of using Assistant Cloud? Please highlight key differentiators.",
-  },
-  {
-    title: "Write code to",
-    description: "demonstrate topological sorting",
-    message:
-      "Can you write TypeScript code that demonstrates topological sorting with a DAG example?",
-  },
-  {
-    title: "Help me write an essay",
-    description: "about AI chat applications",
-    message:
-      "Help me write an essay about modern AI chat applications and their key capabilities.",
-  },
-  {
-    title: "What is the weather",
-    description: "in San Francisco?",
-    message:
-      "What's the current weather in San Francisco? Include temperature and conditions.",
-  },
-];
+const MAX_SECTION_TITLE_LENGTH = 68;
+
+function buildSections(messages: Message[], threadId: string | null): ReportSectionData[] {
+  const sections: ReportSectionData[] = [];
+  messages.forEach((message, index) => {
+    if (message.role !== "assistant") {
+      return;
+    }
+
+    const precedingUser = findPrecedingUser(messages, index);
+    const rawTitle = precedingUser?.content?.split("\n")[0] ?? `AI 인사이트 ${index + 1}`;
+    const title = rawTitle.length > MAX_SECTION_TITLE_LENGTH
+      ? `${rawTitle.slice(0, MAX_SECTION_TITLE_LENGTH)}…`
+      : rawTitle;
+
+    const tags = message.tags?.filter(Boolean) ?? [];
+
+    sections.push({
+      id: `${threadId ?? "local"}-${index}`,
+      title,
+      content: message.content,
+      metrics:
+        tags.length > 0 ? tags.map((tag) => ({ label: tag, value: "" })) : undefined,
+    });
+  });
+  return sections;
+}
+
+function findPrecedingUser(messages: Message[], assistantIndex: number) {
+  for (let i = assistantIndex - 1; i >= 0; i -= 1) {
+    if (messages[i].role === "user") return messages[i];
+  }
+  return null;
+}
+
+function buildSources(urls: string[]): ReportSource[] {
+  return urls.map((url) => ({
+    title: extractDomain(url),
+    url,
+  }));
+}
+
+function extractDomain(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (err) {
+    return url;
+  }
+}
+
+function computeDurationSeconds(events: ActivityEvent[]) {
+  if (events.length < 2) return 30;
+  const first = new Date(events[0].timestamp).getTime();
+  const last = new Date(events[events.length - 1].timestamp).getTime();
+  if (Number.isNaN(first) || Number.isNaN(last) || last <= first) {
+    return 30;
+  }
+  return Math.max(30, Math.round((last - first) / 1000));
+}
 
 type ActivityEvent = {
   type: "user" | "assistant" | "log";
@@ -87,9 +124,55 @@ export default function Home() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [processLogs, setProcessLogs] = useState<string[]>([]);
-  const [showProcessLogs, setShowProcessLogs] = useState(false);
   const [activityEvents, setActivityEvents] = useState<Record<string, ActivityEvent[]>>({});
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+  const [themePreference, setThemePreference] = useState<"light" | "dark" | "system">(() => {
+    if (typeof window !== "undefined") {
+      return (
+        (window.localStorage.getItem("preferred-theme") as
+          | "light"
+          | "dark"
+          | "system"
+          | null) || "system"
+      );
+    }
+    return "system";
+  });
+
+  const applyThemePreference = useCallback((value: "light" | "dark" | "system") => {
+    if (typeof document !== "undefined") {
+      const isDarkPreferred =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const finalTheme = value === "system" ? (isDarkPreferred ? "dark" : "light") : value;
+      document.body.dataset.theme = finalTheme;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("preferred-theme", value);
+    }
+  }, []);
+
+  useEffect(() => {
+    applyThemePreference(themePreference);
+  }, [themePreference, applyThemePreference]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const listener = (event: MediaQueryListEvent) => {
+      if (themePreference === "system") {
+        document.body.dataset.theme = event.matches ? "dark" : "light";
+      }
+    };
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    }
+
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, [themePreference]);
 
   useEffect(() => {
     const apiKeyToUse =
@@ -99,6 +182,25 @@ export default function Home() {
     const newClient = createLangGraphClient(apiUrl, apiKeyToUse);
     setClient(newClient);
   }, [apiUrl, apiKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 1280px)");
+    const applyState = (matches: boolean) => {
+      setIsRightSidebarOpen(!matches);
+    };
+
+    applyState(media.matches);
+
+    const listener = (event: MediaQueryListEvent) => applyState(event.matches);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    }
+
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, []);
 
   useEffect(() => {
     if (!client || serverThreadsLoaded) return;
@@ -122,11 +224,28 @@ export default function Home() {
             if (typeof msg !== "object" || msg === null) continue;
             const role = (msg.type || msg.role || "").toString().toLowerCase();
             const content = msg.content || "";
+            const timestamp =
+              (msg.created_at as string | undefined) ||
+              (msg.timestamp as string | undefined) ||
+              new Date().toISOString();
+            const tags = Array.isArray((msg as any).tags)
+              ? ((msg as any).tags as string[])
+              : undefined;
 
             if (role.includes("human") || role.includes("user")) {
-              formatted.push({ role: "user", content: String(content) });
+              formatted.push({
+                role: "user",
+                content: String(content),
+                timestamp,
+                tags,
+              });
             } else if (role.includes("ai") || role.includes("assistant")) {
-              formatted.push({ role: "assistant", content: String(content) });
+              formatted.push({
+                role: "assistant",
+                content: String(content),
+                timestamp,
+                tags,
+              });
             }
           }
           return formatted;
@@ -157,8 +276,9 @@ export default function Home() {
               const events = formattedMessages.map((message) => ({
                 type: message.role,
                 content: message.content,
-                timestamp: new Date().toISOString(),
-              } as ActivityEvent));
+                timestamp:
+                  message.timestamp || thread.created_at || new Date().toISOString(),
+              }));
               return {
                 ...prev,
                 [serverThreadId]: events,
@@ -284,7 +404,8 @@ export default function Home() {
   const handleSendMessage = async (message: string) => {
     if (!client || !threadId) return;
 
-    const userMessage = { role: "user" as const, content: message };
+    const timestamp = new Date().toISOString();
+    const userMessage = { role: "user" as const, content: message, timestamp };
     addMessage(userMessage);
     updateThreadMetadata(threadId, "user", message);
 
@@ -297,7 +418,7 @@ export default function Home() {
           {
             type: "user",
             content: message,
-            timestamp: new Date().toISOString(),
+            timestamp,
           },
         ],
       };
@@ -305,7 +426,6 @@ export default function Home() {
 
     setIsStreaming(true);
     setProcessLogs([]);
-    setShowProcessLogs(true);
 
     const fetchFinalAssistantResponse = async () => {
       try {
@@ -395,8 +515,8 @@ export default function Home() {
                 for (const [nodeName, nodeData] of Object.entries(data)) {
                   if (nodeName === "__start__") continue;
 
-                  const timestamp = new Date().toISOString();
-                  const readableTime = new Date(timestamp).toLocaleTimeString("ko-KR", {
+                  const eventTimestamp = new Date().toISOString();
+                  const readableTime = new Date(eventTimestamp).toLocaleTimeString("ko-KR", {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",
@@ -412,7 +532,7 @@ export default function Home() {
                         {
                           type: "log",
                           content: logEntry,
-                          timestamp,
+                          timestamp: eventTimestamp,
                         },
                       ],
                     };
@@ -496,6 +616,7 @@ export default function Home() {
             };
           });
         } else {
+          const fallbackTimestamp = new Date().toISOString();
           updateLastAssistantMessage("응답을 불러오지 못했습니다.");
           setActivityEvents((prev) => {
             const prevEvents = prev[threadId] ?? [];
@@ -506,7 +627,7 @@ export default function Home() {
                 {
                   type: "assistant",
                   content: "응답을 불러오지 못했습니다.",
-                  timestamp: new Date().toISOString(),
+                  timestamp: fallbackTimestamp,
                 },
               ],
             };
@@ -518,6 +639,7 @@ export default function Home() {
 
       const fallbackResponse = await fetchFinalAssistantResponse();
       if (fallbackResponse) {
+        const fallbackTimestamp = new Date().toISOString();
         updateLastAssistantMessage(fallbackResponse);
         updateThreadMetadata(threadId, "assistant", fallbackResponse);
         setActivityEvents((prev) => {
@@ -529,12 +651,13 @@ export default function Home() {
               {
                 type: "assistant",
                 content: fallbackResponse,
-                timestamp: new Date().toISOString(),
+                timestamp: fallbackTimestamp,
               },
             ],
           };
         });
       } else {
+        const fallbackTimestamp = new Date().toISOString();
         updateLastAssistantMessage("응답을 불러오지 못했습니다.");
         setActivityEvents((prev) => {
           const prevEvents = prev[threadId] ?? [];
@@ -545,7 +668,7 @@ export default function Home() {
               {
                 type: "assistant",
                 content: "응답을 불러오지 못했습니다.",
-                timestamp: new Date().toISOString(),
+                timestamp: fallbackTimestamp,
               },
             ],
           };
@@ -563,7 +686,6 @@ export default function Home() {
     }
 
     setProcessLogs([]);
-    setShowProcessLogs(false);
     reset();
 
     try {
@@ -594,14 +716,14 @@ export default function Home() {
     }
   };
 
-  const assistantMessages = messages.filter((m) => m.role === "assistant");
-  const latestAssistantMessage =
-    assistantMessages.length > 0
-      ? assistantMessages[assistantMessages.length - 1]
-      : null;
-  const referenceLinks = latestAssistantMessage
-    ? extractUrlsFromText(latestAssistantMessage.content).map((url) => ({ url }))
-    : [];
+  const assistantMessages = messages.filter((msg) => msg.role === "assistant");
+  const latestAssistantMessage = assistantMessages.at(-1) || null;
+  const allReferenceUrls = Array.from(
+    new Set(
+      assistantMessages.flatMap((msg) => extractUrlsFromText(msg.content || ""))
+    )
+  );
+  const referenceLinks = allReferenceUrls.map((url) => ({ url }));
   const activityFeed = messages.map((message) => ({
     type: message.role,
     content: message.content,
@@ -611,33 +733,80 @@ export default function Home() {
     ? activityEvents[threadId] ?? activityFeed
     : [];
 
-  const handleQuickPrompt = (prompt: string) => {
-    if (isStreaming || isLoading) return;
-    handleSendMessage(prompt);
+  const reportSections = buildSections(messages, threadId);
+  const reportSources: ReportSource[] = buildSources(allReferenceUrls);
+  const reportOverview = latestAssistantMessage?.content ||
+    (reportSections[0]?.content ?? "아직 생성된 리포트가 없습니다.");
+  const reportDuration = computeDurationSeconds(currentActivityEvents);
+  const reportStatus: "loading" | "completed" | "error" =
+    isStreaming || isLoading
+      ? "loading"
+      : assistantMessages.length > 0
+      ? "completed"
+      : "loading";
+  const reportTitle = threads[threadId || ""]?.title || "AI Research Agent";
+  const reportSubtitle = messages.find((msg) => msg.role === "user")?.content
+    ?.split("\n")[0]
+    ?.slice(0, 80) || "심층 분석 리포트";
+
+  const reportData = {
+    title: reportTitle,
+    subtitle: reportSubtitle,
+    status: reportStatus,
+    duration: reportDuration,
+    overview: reportOverview,
+    sections: reportSections,
+    sources: reportSources,
+  } as const;
+
+  const handleDeepResearch = (message: string) => {
+    if (!message.trim()) return;
+    const enriched = `[Deep Research] ${message.trim()}`;
+    void handleSendMessage(enriched);
   };
 
   return (
     <div className="h-screen overflow-hidden flex bg-[var(--bg-root)] text-[var(--text-primary)]">
       <Sidebar onNewThread={handleNewThreadClick} />
       <div className="flex-1 flex flex-col bg-transparent min-w-0 min-h-0">
-        <header className="border-b border-[#e0e4f6] bg-white flex-shrink-0 shadow-sm">
+        <header className="border-b border-[var(--panel-border)] bg-[var(--panel-bg)] flex-shrink-0 shadow-sm">
           <div className="max-w-4xl mx-auto w-full px-8 py-6 flex items-center justify-between gap-4">
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.5em] text-[#8a8a94]">
+              <span className="text-xs uppercase tracking-[0.5em] text-[var(--text-secondary)]">
                 Research Agent
               </span>
               <h1 className="text-[2.15rem] font-semibold text-[var(--text-primary)] tracking-tight">
                 AI Research Agent
               </h1>
-              <p className="text-[15px] text-[#60606a] leading-6">
+              <p className="text-[15px] text-[var(--text-secondary)] leading-6">
                 LangGraph 기반 심층 리서치를 돕는 정교한 워크스페이스
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex items-center bg-[var(--panel-bg)] border border-[var(--panel-border)] rounded-full px-1 py-1">
+                {[
+                  { label: "Light", value: "light" as const },
+                  { label: "Dark", value: "dark" as const },
+                  { label: "System", value: "system" as const },
+                ].map(({ label, value }) => (
+                  <button
+                    key={value}
+                    onClick={() => setThemePreference(value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                      themePreference === value
+                        ? "bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                    aria-pressed={themePreference === value}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => setIsRightSidebarOpen((prev) => !prev)}
                 aria-label="Toggle insights"
-                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[#d4d4da] shadow-sm transition-colors ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[var(--sidebar-border)] shadow-sm transition-colors ${
                   isRightSidebarOpen
                     ? "bg-[#f0f0f3] text-[var(--text-primary)] hover:bg-[#e4e4e9]"
                     : "bg-white text-[var(--text-primary)] hover:bg-[#f0f0f3]"
@@ -648,71 +817,47 @@ export default function Home() {
             </div>
           </div>
         </header>
-        <main className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-root)] px-12 md:px-20 lg:px-28 xl:px-36 py-10">
-          {messages.length > 0 ? (
-            <div className="space-y-5">
-              {messages.map((message, index) => (
-                <ChatMessage key={index} message={message} />
-              ))}
-              {isStreaming && <div className="text-[#6b7195] px-4">생성 중...</div>}
-              {showProcessLogs && processLogs.length > 0 && (
-                <div className="bg-[var(--bg-surface)] border border-[#dfe0e6] rounded-[26px] shadow-lg">
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#e0e4f6]">
-                    <h3 className="text-[var(--text-primary)] font-semibold text-sm tracking-wide">
-                      🔄 처리 과정
-                    </h3>
-                    <button
-                      onClick={() => setShowProcessLogs(false)}
-                      className="text-[#6f6f78] hover:text-[var(--text-primary)] text-sm"
-                    >
-                      닫기
-                    </button>
-                  </div>
-                  <div className="text-sm text-[#5f5f68] space-y-1 max-h-56 overflow-y-auto px-5 py-4">
-                    {processLogs.slice(-20).map((log, index) => (
-                      <div key={index}>{log}</div>
-                    ))}
-                  </div>
+        <main className="flex-1 min-h-0 bg-[var(--bg-root)] flex flex-col overflow-hidden">
+          {assistantMessages.length > 0 ? (
+            <>
+              <div className="flex-1 min-h-0 overflow-y-auto px-12 md:px-20 lg:px-28 xl:px-36 pt-10 pb-32">
+                <ResearchReport data={reportData} />
+              </div>
+              <div className="flex-shrink-0 bg-[var(--bg-surface)] px-6 md:px-12 lg:px-20 xl:px-28 pt-20 pb-24 border-t-2 border-[var(--panel-border)] shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.12)]">
+                <div className="max-w-2xl mx-auto w-full">
+                  <ChatInput
+                    onSend={handleSendMessage}
+                    onDeepResearch={handleDeepResearch}
+                    disabled={isStreaming || isLoading}
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 text-center space-y-6">
-              <h2 className="text-[30px] md:text-[34px] font-semibold text-[var(--text-primary)]">
-                Ready to dive deep?
-              </h2>
-              <p className="text-[#838389] text-lg leading-relaxed">
-                What would you like to research?
-              </p>
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="mb-12 text-center px-4">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <h2 className="text-5xl font-semibold text-[var(--text-primary)] tracking-tight">
+                    연구개발AI팀
+                  </h2>
+                  <span className="px-3 py-1 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)] uppercase tracking-wider">
+                    챗봇
+                  </span>
+                </div>
+              </div>
+              <div className="w-full max-w-3xl px-4">
+                <ChatInput
+                  onSend={handleSendMessage}
+                  onDeepResearch={handleDeepResearch}
+                  disabled={isStreaming || isLoading}
+                />
+              </div>
             </div>
           )}
         </main>
-        <div className="flex-shrink-0 bg-[var(--bg-root)] px-6 md:px-12 lg:px-20 xl:px-28 pb-12">
-          <div className="max-w-2xl mx-auto w-full space-y-6">
-            {messages.length === 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {quickPrompts.map((prompt) => (
-                  <button
-                    key={prompt.title}
-                    onClick={() => handleQuickPrompt(prompt.message)}
-                    className="text-left bg-white border border-[#dfe0e6] hover:border-[var(--accent)]/45 hover:shadow-lg transition-all rounded-[22px] px-5 py-4 shadow-sm"
-                  >
-                    <div className="text-sm font-semibold text-[var(--text-primary)]">
-                      {prompt.title}
-                    </div>
-                    <div className="text-xs text-[#7c7c85] mt-1">
-                      {prompt.description}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <ChatInput onSend={handleSendMessage} disabled={isStreaming || isLoading} />
-          </div>
-        </div>
       </div>
       {isRightSidebarOpen && (
-        <div className="flex-shrink-0 border-l border-[#dcdce2] bg-white">
+        <div className="flex-shrink-0 border-l border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] w-[260px] transition-all duration-200">
           <RightSidebar
             references={referenceLinks}
             activity={currentActivityEvents}

@@ -1,0 +1,108 @@
+.sectionCard {
+  background: var(--color-bg-primary);
+}
+
+.sectionHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sectionHeader:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 4px;
+}
+
+.sectionTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  text-align: left;
+}
+
+.sectionNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-accent-blue-light);
+  color: var(--color-accent-blue);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.sectionToggle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-base);
+}
+
+.open {
+  transform: rotate(180deg);
+}
+
+.sectionMarkdown {
+  font-size: var(--font-size-base);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
+}
+
+.sectionMarkdown :global(h2),
+.sectionMarkdown :global(h3),
+.sectionMarkdown :global(h4) {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.sectionMarkdown :global(p) {
+  margin: 0;
+}
+
+.sectionMarkdown :global(ul),
+.sectionMarkdown :global(ol) {
+  padding-left: var(--spacing-xl);
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.sectionMarkdown :global(code) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+}
+
+.sectionMarkdown :global(blockquote) {
+  border-left: 3px solid var(--color-accent-blue-light);
+  padding-left: var(--spacing-md);
+  color: var(--color-text-secondary);
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+}

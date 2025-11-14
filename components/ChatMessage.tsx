@@ -10,59 +10,43 @@ interface ChatMessageProps {
 export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
 
-  const userMarkdownClass =
-    "space-y-4 prose prose-sm max-w-none break-words prose-headings:text-[var(--text-primary)] prose-p:text-[var(--text-primary)] prose-strong:text-[var(--text-primary)] prose-em:text-[var(--text-primary)] prose-code:text-[var(--text-primary)] prose-li:text-[var(--text-primary)] prose-ul:text-[var(--text-primary)] prose-ol:text-[var(--text-primary)] prose-a:text-[var(--text-primary)] hover:prose-a:text-[var(--text-primary)]/80";
+  const markdownClass =
+    "prose prose-sm md:prose-base max-w-none break-words prose-headings:font-semibold prose-p:leading-7 prose-li:leading-7 prose-a:text-[var(--accent)] hover:prose-a:text-[var(--accent)]/80";
 
-  const assistantMarkdownClass =
-    "space-y-6 prose prose-sm md:prose-base max-w-none break-words prose-headings:font-semibold prose-headings:text-[var(--text-primary)] prose-p:text-[var(--text-primary)] prose-li:text-[var(--text-primary)] prose-strong:text-[var(--text-primary)] prose-code:text-[var(--text-primary)] prose-a:text-[var(--text-primary)] hover:prose-a:text-[var(--text-primary)]/80";
+  const containerClasses = isUser
+    ? "w-fit min-w-[220px] max-w-[65%] xl:max-w-[55%] bg-[var(--chat-user-bg)] text-[var(--chat-user-text)] border-[var(--chat-user-border)] shadow-[var(--chat-user-shadow)]"
+    : "w-full bg-[var(--chat-assistant-bg)] text-[var(--chat-assistant-text)] border-[var(--chat-assistant-border)] shadow-[var(--chat-assistant-shadow)]";
 
   return (
     <div className="py-4">
-      <div className="max-w-4xl mx-auto px-12 md:px-16">
+      <div className="max-w-4xl mx-auto px-10 md:px-16">
         <div
-          className={`flex w-full gap-4 ${
+          className={`flex w-full ${
             isUser ? "justify-end" : "justify-start"
           }`}
         >
-          {!isUser && (
-            <div className="mt-1 flex-shrink-0 flex items-start">
-              <div className="w-9 h-9 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center font-semibold border border-[#d4d4db]">
-                🤖
-              </div>
+          <div
+            className={`${containerClasses} rounded-[22px] px-8 py-5 transition-all border`}
+          >
+            <div className="text-[11px] uppercase tracking-[0.35em] text-[var(--text-secondary)]/70 mb-2">
+              {isUser ? "You" : "AI"}
             </div>
-          )}
-
-          {isUser ? (
-            <div
-              className={`w-fit min-w-[260px] max-w-[65%] xl:max-w-[55%] rounded-[28px] px-12 py-6 shadow-[0_18px_44px_-32px_rgba(30,30,30,0.25)] transition-transform bg-[#f0f0f3] text-[var(--text-primary)] border border-[#d4d4da]`}
-            >
-              <div className="max-w-none text-[17px] leading-[1.75] break-words text-[var(--text-primary)]">
-                <div className={userMarkdownClass}>
-                  {message.role !== "assistant" ? (
-                    <p className="whitespace-pre-wrap mb-0 text-inherit">
-                      {message.content}
-                    </p>
-                  ) : (
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  )}
-                </div>
-              </div>
+            <div className={markdownClass}>
+              <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
-          ) : (
-            <div className="flex-1">
-              <div className={assistantMarkdownClass}>
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+            {message.timestamp && (
+              <div
+                className={`mt-3 text-[11px] text-[var(--text-secondary)]/70 ${
+                  isUser ? "text-right" : "text-left"
+                }`}
+              >
+                {new Date(message.timestamp).toLocaleString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </div>
-            </div>
-          )}
-
-          {isUser && (
-            <div className="mt-1 hidden sm:flex flex-shrink-0 items-start">
-              <div className="w-9 h-9 rounded-full bg-[#ececef] text-[var(--accent)] flex items-center justify-center font-semibold border border-[#d4d4db]">
-                🙋
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

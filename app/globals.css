@@ -1,18 +1,102 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "../styles/variables.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-root: #f4f4f6;
+  --bg-root: #f5f6fb;
   --bg-surface: #ffffff;
-  --bg-elevated: #f0f0f2;
-  --text-primary: #1f1f24;
-  --text-secondary: #4f4f58;
-  --accent: #2f2f33;
-  --accent-soft: rgba(47, 47, 51, 0.14);
+  --panel-bg: #ffffff;
+  --panel-border: #e1e4f5;
+  --text-primary: #1b1d2c;
+  --text-secondary: #4f5570;
+  --accent: #3d6aff;
+  --accent-soft: rgba(61, 106, 255, 0.18);
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #dfe2f3;
+  --sidebar-icon-bg: #f1f3ff;
+  --sidebar-icon-border: #d7dbf3;
+  --sidebar-icon-hover: #e7e9ff;
+  --sidebar-icon-text: #1b1d2c;
+  --drawer-bg: #f8f9ff;
+  --drawer-border: #e1e4f5;
+  --chat-user-bg: #f2f4f8;
+  --chat-user-text: #1b1d2c;
+  --chat-user-border: #dde1ef;
+  --chat-user-shadow: 0px 18px 42px -28px rgba(25, 32, 60, 0.12);
+  --chat-assistant-bg: #ffffff;
+  --chat-assistant-text: #1b1d2c;
+  --chat-assistant-border: #e5e8f4;
+  --chat-assistant-shadow: 0px 18px 40px -30px rgba(15, 20, 40, 0.08);
+  --input-bg: #ffffff;
+  --input-border: #d9ddf6;
+  --input-icon-bg: #f0f2ff;
+  --input-icon-border: #d9ddf6;
   --radius-card: 22px;
+}
+
+body[data-theme="light"] {
+  --bg-root: #f5f6fb;
+  --bg-surface: #ffffff;
+  --panel-bg: #ffffff;
+  --panel-border: #e1e4f5;
+  --text-primary: #1b1d2c;
+  --text-secondary: #4f5570;
+  --accent: #3d6aff;
+  --accent-soft: rgba(61, 106, 255, 0.18);
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #dfe2f3;
+  --sidebar-icon-bg: #f1f3ff;
+  --sidebar-icon-border: #d7dbf3;
+  --sidebar-icon-hover: #e7e9ff;
+  --sidebar-icon-text: #1b1d2c;
+  --drawer-bg: #f8f9ff;
+  --drawer-border: #e1e4f5;
+  --chat-user-bg: #f2f4f8;
+  --chat-user-text: #1b1d2c;
+  --chat-user-border: #dde1ef;
+  --chat-user-shadow: 0px 18px 42px -28px rgba(25, 32, 60, 0.12);
+  --chat-assistant-bg: #ffffff;
+  --chat-assistant-text: #1b1d2c;
+  --chat-assistant-border: #e5e8f4;
+  --chat-assistant-shadow: 0px 18px 40px -30px rgba(15, 20, 40, 0.08);
+  --input-bg: #ffffff;
+  --input-border: #d9ddf6;
+  --input-icon-bg: #f0f2ff;
+  --input-icon-border: #d9ddf6;
+}
+
+body[data-theme="dark"] {
+  --bg-root: #090a0f;
+  --bg-surface: #11131a;
+  --panel-bg: #11131a;
+  --panel-border: #1c2130;
+  --text-primary: #f4f5f8;
+  --text-secondary: #8d93a5;
+  --accent: #2dc8ff;
+  --accent-soft: rgba(45, 200, 255, 0.22);
+  --sidebar-bg: #0f1118;
+  --sidebar-border: #1c2130;
+  --sidebar-icon-bg: #181b24;
+  --sidebar-icon-border: #232837;
+  --sidebar-icon-hover: #1f2331;
+  --sidebar-icon-text: #eff3ff;
+  --drawer-bg: #11141d;
+  --drawer-border: #1c2130;
+  --chat-user-bg: #1b2232;
+  --chat-user-text: #dce7ff;
+  --chat-user-border: rgba(50, 150, 255, 0.4);
+  --chat-user-shadow: 0px 25px 50px -32px rgba(0, 0, 0, 0.65);
+  --chat-assistant-bg: rgba(17, 20, 29, 0.92);
+  --chat-assistant-text: #f1f3fa;
+  --chat-assistant-border: #1f2433;
+  --chat-assistant-shadow: 0px 25px 48px -32px rgba(0, 0, 0, 0.7);
+  --input-bg: #11131a;
+  --input-border: #1d212d;
+  --input-icon-bg: #181b24;
+  --input-icon-border: #232837;
 }
 
 html,
@@ -36,20 +120,6 @@ body * {
   flex-direction: column;
 }
 
-/* 사이드바 고정 */
-aside {
-  width: 260px !important;
-  min-width: 260px !important;
-  max-width: 260px !important;
-  flex-shrink: 0 !important;
-  flex-grow: 0 !important;
-}
-
-/* 메인 콘텐츠 */
-main {
-  min-width: 0 !important;
-}
-
 /* 스크롤바 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -61,12 +131,20 @@ main {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(92, 102, 118, 0.5);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6);
+  background: rgba(92, 102, 118, 0.7);
+}
+
+body[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(69, 76, 92, 0.6);
+}
+
+body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 76, 92, 0.8);
 }
 
 /* 마크다운 */
@@ -75,17 +153,17 @@ main {
 }
 
 .prose code {
-  background-color: rgba(72, 100, 255, 0.08);
-  color: #1b1d2c;
+  background-color: rgba(61, 106, 255, 0.08);
+  color: var(--text-primary);
   padding: 0.28rem 0.5rem;
   border-radius: 0.45rem;
   font-size: 0.9em;
-  border: 1px solid rgba(72, 100, 255, 0.18);
+  border: 1px solid rgba(61, 106, 255, 0.2);
 }
 
 .prose pre {
-  background: #f4f6ff;
-  border: 1px solid rgba(72, 100, 255, 0.15);
+  background: #0f1118;
+  border: 1px solid rgba(45, 200, 255, 0.18);
   border-radius: 0.75rem;
   padding: 1.1rem;
   overflow-x: auto;
@@ -93,11 +171,11 @@ main {
 }
 
 .prose a {
-  color: #3a55ff;
+  color: #4fd0ff;
 }
 
 .prose a:hover {
-  color: #233df0;
+  color: #84e3ff;
 }
 
 .prose h1,
@@ -112,6 +190,6 @@ main {
 
 .prose p,
 .prose li {
-  color: #2c2f3f;
+  color: var(--text-secondary);
   line-height: 1.8;
 }

@@ -46,19 +46,40 @@ export const useThreadStore = create<ThreadStore>((set, get) => ({
   switchToThreadId: null,
 
   setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  addMessage: (message) =>
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        {
+          ...message,
+          timestamp: message.timestamp || new Date().toISOString(),
+        },
+      ],
+    })),
   updateLastAssistantMessage: (content) =>
     set((state) => {
       const updatedMessages = [...state.messages];
       if (updatedMessages.length === 0) {
-        updatedMessages.push({ role: "assistant", content });
+        updatedMessages.push({
+          role: "assistant",
+          content,
+          timestamp: new Date().toISOString(),
+        });
       } else {
         const lastIndex = updatedMessages.length - 1;
         const lastMessage = updatedMessages[lastIndex];
         if (lastMessage.role === "assistant") {
-          updatedMessages[lastIndex] = { ...lastMessage, content };
+          updatedMessages[lastIndex] = {
+            ...lastMessage,
+            content,
+            timestamp: new Date().toISOString(),
+          };
         } else {
-          updatedMessages.push({ role: "assistant", content });
+          updatedMessages.push({
+            role: "assistant",
+            content,
+            timestamp: new Date().toISOString(),
+          });
         }
       }
       return { messages: updatedMessages };
@@ -95,7 +116,13 @@ export const useThreadStore = create<ThreadStore>((set, get) => ({
             title,
             created_at: new Date().toISOString(),
             message_count: 1,
-            messages: [{ role, content }],
+            messages: [
+              {
+                role,
+                content,
+                timestamp: new Date().toISOString(),
+              },
+            ],
           },
         },
       });
@@ -103,7 +130,14 @@ export const useThreadStore = create<ThreadStore>((set, get) => ({
       const updatedThread = {
         ...thread,
         message_count: thread.message_count + 1,
-        messages: [...thread.messages, { role, content }],
+        messages: [
+          ...thread.messages,
+          {
+            role,
+            content,
+            timestamp: new Date().toISOString(),
+          },
+        ],
       };
       
       if (thread.message_count === 0 && role === "user") {

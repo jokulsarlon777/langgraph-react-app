@@ -1,0 +1,29 @@
+.researchReport {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-2xl) var(--spacing-2xl) 8rem var(--spacing-2xl);
+  max-width: 960px;
+  margin: 0 auto;
+  min-height: calc(100vh - 160px);
+  background: linear-gradient(180deg, rgba(248, 249, 251, 0.85), rgba(248, 249, 251, 0));
+}
+
+.reportContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.reportSections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+@media (max-width: 768px) {
+  .researchReport {
+    padding: var(--spacing-lg);
+    gap: var(--spacing-lg);
+  }
+}

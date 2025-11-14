@@ -1,0 +1,73 @@
+.overviewCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.overviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.overviewTitle {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.overviewIcon {
+  font-size: var(--font-size-2xl);
+}
+
+.overviewContent {
+  font-size: var(--font-size-base);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.overviewMarkdown {
+  font-size: var(--font-size-base);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.overviewMarkdown :global(h1),
+.overviewMarkdown :global(h2),
+.overviewMarkdown :global(h3) {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.overviewMarkdown :global(p) {
+  margin: 0;
+}
+
+.overviewMarkdown :global(ul),
+.overviewMarkdown :global(ol) {
+  padding-left: var(--spacing-xl);
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.overviewMarkdown :global(code) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+}
+
+.overviewMarkdown :global(blockquote) {
+  border-left: 3px solid var(--color-accent-blue-light);
+  padding-left: var(--spacing-md);
+  color: var(--color-text-secondary);
+}
