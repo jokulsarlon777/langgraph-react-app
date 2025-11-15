@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatInput from "@/components/ChatInput";
 import RightSidebar from "@/components/RightSidebar";
@@ -22,6 +22,8 @@ import type {
   ReportSectionData,
   ReportSource,
 } from "@/components/ResearchReport/types";
+import toast from "react-hot-toast";
+import { classifyError, getErrorMessage, isRetryable, ErrorType } from "@/lib/errorHandler";
 
 const extractUrlsFromText = (text: string): string[] => {
   if (!text) return [];
@@ -126,18 +128,12 @@ export default function Home() {
   const [processLogs, setProcessLogs] = useState<string[]>([]);
   const [activityEvents, setActivityEvents] = useState<Record<string, ActivityEvent[]>>({});
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
-  const [themePreference, setThemePreference] = useState<"light" | "dark" | "system">(() => {
-    if (typeof window !== "undefined") {
-      return (
-        (window.localStorage.getItem("preferred-theme") as
-          | "light"
-          | "dark"
-          | "system"
-          | null) || "system"
-      );
-    }
-    return "system";
-  });
+  const [lastFailedMessage, setLastFailedMessage] = useState<{ message: string; threadId: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [themePreference, setThemePreference] = useState<"light" | "dark" | "system">("system");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const [shouldAutoFocus, setShouldAutoFocus] = useState(false);
 
   const applyThemePreference = useCallback((value: "light" | "dark" | "system") => {
     if (typeof document !== "undefined") {
@@ -152,9 +148,22 @@ export default function Home() {
     }
   }, []);
 
+  // 클라이언트 사이드에서만 테마 설정 로드
   useEffect(() => {
-    applyThemePreference(themePreference);
-  }, [themePreference, applyThemePreference]);
+    setMounted(true);
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("preferred-theme");
+      if (stored === "light" || stored === "dark" || stored === "system") {
+        setThemePreference(stored);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      applyThemePreference(themePreference);
+    }
+  }, [themePreference, applyThemePreference, mounted]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -292,6 +301,9 @@ export default function Home() {
         }
       } catch (error) {
         console.error("Initialization error:", error);
+        toast.error(`스레드 목록을 불러오는데 실패했습니다: ${getErrorMessage(error)}`, {
+          duration: 5000,
+        });
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -332,8 +344,12 @@ export default function Home() {
           [newThreadId]: [],
         }));
         setMessages([]);
+        toast.success("새 대화가 생성되었습니다.", { duration: 2000 });
       } catch (error) {
         console.error("Failed to create new thread:", error);
+        toast.error(`새 대화 생성 실패: ${getErrorMessage(error)}`, {
+          duration: 5000,
+        });
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -391,8 +407,12 @@ export default function Home() {
 
         setSwitchToThreadId(null);
         setIsLoading(false);
+        toast.success("대화를 불러왔습니다.", { duration: 2000 });
       } catch (error) {
         console.error("Thread switch error:", error);
+        toast.error(`대화 불러오기 실패: ${getErrorMessage(error)}`, {
+          duration: 5000,
+        });
         setIsLoading(false);
       }
     };
@@ -401,31 +421,43 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, switchToThreadId]);
 
-  const handleSendMessage = async (message: string) => {
-    if (!client || !threadId) return;
+  const handleSendMessage = async (message: string, isRetry = false) => {
+    if (!client || !threadId) {
+      toast.error("클라이언트가 준비되지 않았습니다.");
+      return;
+    }
 
+    setShouldAutoFocus(false); // 메시지 전송 후 자동 포커스 비활성화
     const timestamp = new Date().toISOString();
-    const userMessage = { role: "user" as const, content: message, timestamp };
-    addMessage(userMessage);
-    updateThreadMetadata(threadId, "user", message);
+    
+    // 재시도가 아닌 경우에만 사용자 메시지 추가
+    if (!isRetry) {
+      const userMessage = { role: "user" as const, content: message, timestamp };
+      addMessage(userMessage);
+      updateThreadMetadata(threadId, "user", message);
 
-    setActivityEvents((prev) => {
-      const prevEvents = prev[threadId] ?? [];
-      return {
-        ...prev,
-        [threadId]: [
-          ...prevEvents,
-          {
-            type: "user",
-            content: message,
-            timestamp,
-          },
-        ],
-      };
-    });
+      setActivityEvents((prev) => {
+        const prevEvents = prev[threadId] ?? [];
+        return {
+          ...prev,
+          [threadId]: [
+            ...prevEvents,
+            {
+              type: "user",
+              content: message,
+              timestamp,
+            },
+          ],
+        };
+      });
+    }
 
     setIsStreaming(true);
     setProcessLogs([]);
+    setLastFailedMessage(null);
+
+    // 로딩 토스트 표시
+    const loadingToast = toast.loading("메시지를 전송하는 중...");
 
     const fetchFinalAssistantResponse = async () => {
       try {
@@ -596,6 +628,8 @@ export default function Home() {
             ],
           };
         });
+        toast.dismiss(loadingToast);
+        toast.success("응답을 받았습니다.", { duration: 2000 });
       } else {
         const fallbackResponse = await fetchFinalAssistantResponse();
         if (fallbackResponse) {
@@ -615,6 +649,8 @@ export default function Home() {
               ],
             };
           });
+          toast.dismiss(loadingToast);
+          toast.success("응답을 복구했습니다.", { duration: 2000 });
         } else {
           const fallbackTimestamp = new Date().toISOString();
           updateLastAssistantMessage("응답을 불러오지 못했습니다.");
@@ -636,57 +672,122 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Message send error:", error);
+      
+      // 로딩 토스트 제거
+      toast.dismiss(loadingToast);
 
-      const fallbackResponse = await fetchFinalAssistantResponse();
-      if (fallbackResponse) {
-        const fallbackTimestamp = new Date().toISOString();
-        updateLastAssistantMessage(fallbackResponse);
-        updateThreadMetadata(threadId, "assistant", fallbackResponse);
-        setActivityEvents((prev) => {
-          const prevEvents = prev[threadId] ?? [];
-          return {
-            ...prev,
-            [threadId]: [
-              ...prevEvents,
-              {
-                type: "assistant",
-                content: fallbackResponse,
-                timestamp: fallbackTimestamp,
-              },
-            ],
-          };
+      const appError = classifyError(error);
+      const errorMessage = getErrorMessage(error);
+      const canRetry = isRetryable(error);
+
+      // 에러 타입에 따른 토스트 메시지
+      if (appError.type === ErrorType.NETWORK) {
+        toast.error(errorMessage, {
+          duration: 5000,
+          icon: "📡",
+        });
+      } else if (appError.type === ErrorType.TIMEOUT) {
+        toast.error(errorMessage, {
+          duration: 5000,
+          icon: "⏱️",
+        });
+      } else if (appError.type === ErrorType.API_ERROR) {
+        toast.error(errorMessage, {
+          duration: 5000,
+          icon: "⚠️",
         });
       } else {
-        const fallbackTimestamp = new Date().toISOString();
-        updateLastAssistantMessage("응답을 불러오지 못했습니다.");
-        setActivityEvents((prev) => {
-          const prevEvents = prev[threadId] ?? [];
-          return {
-            ...prev,
-            [threadId]: [
-              ...prevEvents,
-              {
-                type: "assistant",
-                content: "응답을 불러오지 못했습니다.",
-                timestamp: fallbackTimestamp,
-              },
-            ],
-          };
+        toast.error(errorMessage, {
+          duration: 5000,
         });
       }
+
+      // 재시도 가능한 경우 재시도 버튼 제공
+      if (canRetry && !isRetry) {
+        setLastFailedMessage({ message, threadId });
+        toast.error(
+          (t) => (
+            <div className="flex flex-col gap-2">
+              <span>{errorMessage}</span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  setLastFailedMessage(null);
+                  void handleSendMessage(message, true);
+                }}
+                className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+              >
+                다시 시도
+              </button>
+            </div>
+          ),
+          {
+            duration: 10000,
+            icon: "🔄",
+          }
+        );
+      }
+
+      // Fallback: 최종 응답 가져오기 시도
+      try {
+        const fallbackResponse = await fetchFinalAssistantResponse();
+        if (fallbackResponse) {
+          const fallbackTimestamp = new Date().toISOString();
+          updateLastAssistantMessage(fallbackResponse);
+          updateThreadMetadata(threadId, "assistant", fallbackResponse);
+          setActivityEvents((prev) => {
+            const prevEvents = prev[threadId] ?? [];
+            return {
+              ...prev,
+              [threadId]: [
+                ...prevEvents,
+                {
+                  type: "assistant",
+                  content: fallbackResponse,
+                  timestamp: fallbackTimestamp,
+                },
+              ],
+            };
+          });
+          toast.success("응답을 복구했습니다.");
+          return;
+        }
+      } catch (fallbackError) {
+        console.error("Fallback failed:", fallbackError);
+      }
+
+      // Fallback도 실패한 경우
+      const fallbackTimestamp = new Date().toISOString();
+      updateLastAssistantMessage("응답을 불러오지 못했습니다. 다시 시도해주세요.");
+      setActivityEvents((prev) => {
+        const prevEvents = prev[threadId] ?? [];
+        return {
+          ...prev,
+          [threadId]: [
+            ...prevEvents,
+            {
+              type: "assistant",
+              content: "응답을 불러오지 못했습니다. 다시 시도해주세요.",
+              timestamp: fallbackTimestamp,
+            },
+          ],
+        };
+      });
     } finally {
       setIsStreaming(false);
+      toast.dismiss(loadingToast);
     }
   };
 
   const handleNewThreadClick = async () => {
     if (!client) {
-      console.error("Client not ready");
+      toast.error("클라이언트가 준비되지 않았습니다.");
       return;
     }
 
     setProcessLogs([]);
     reset();
+    setShouldAutoFocus(true); // 새 스레드 생성 시 자동 포커스
 
     try {
       setIsLoading(true);
@@ -716,103 +817,229 @@ export default function Home() {
     }
   };
 
-  const assistantMessages = messages.filter((msg) => msg.role === "assistant");
-  const latestAssistantMessage = assistantMessages.at(-1) || null;
-  const allReferenceUrls = Array.from(
-    new Set(
-      assistantMessages.flatMap((msg) => extractUrlsFromText(msg.content || ""))
-    )
+  // 메모이제이션을 통한 불필요한 재계산 방지
+  const assistantMessages = useMemo(
+    () => messages.filter((msg) => msg.role === "assistant"),
+    [messages]
   );
-  const referenceLinks = allReferenceUrls.map((url) => ({ url }));
-  const activityFeed = messages.map((message) => ({
-    type: message.role,
-    content: message.content,
-    timestamp: new Date().toISOString(),
-  }));
-  const currentActivityEvents = threadId
-    ? activityEvents[threadId] ?? activityFeed
-    : [];
 
-  const reportSections = buildSections(messages, threadId);
-  const reportSources: ReportSource[] = buildSources(allReferenceUrls);
-  const reportOverview = latestAssistantMessage?.content ||
-    (reportSections[0]?.content ?? "아직 생성된 리포트가 없습니다.");
-  const reportDuration = computeDurationSeconds(currentActivityEvents);
-  const reportStatus: "loading" | "completed" | "error" =
-    isStreaming || isLoading
-      ? "loading"
-      : assistantMessages.length > 0
-      ? "completed"
-      : "loading";
-  const reportTitle = threads[threadId || ""]?.title || "AI Research Agent";
-  const reportSubtitle = messages.find((msg) => msg.role === "user")?.content
-    ?.split("\n")[0]
-    ?.slice(0, 80) || "심층 분석 리포트";
+  const latestAssistantMessage = useMemo(
+    () => assistantMessages.at(-1) || null,
+    [assistantMessages]
+  );
 
-  const reportData = {
-    title: reportTitle,
-    subtitle: reportSubtitle,
-    status: reportStatus,
-    duration: reportDuration,
-    overview: reportOverview,
-    sections: reportSections,
-    sources: reportSources,
-  } as const;
+  const allReferenceUrls = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          assistantMessages.flatMap((msg) =>
+            extractUrlsFromText(msg.content || "")
+          )
+        )
+      ),
+    [assistantMessages]
+  );
 
-  const handleDeepResearch = (message: string) => {
-    if (!message.trim()) return;
-    const enriched = `[Deep Research] ${message.trim()}`;
-    void handleSendMessage(enriched);
-  };
+  const referenceLinks = useMemo(
+    () => allReferenceUrls.map((url) => ({ url })),
+    [allReferenceUrls]
+  );
+
+  const activityFeed = useMemo(
+    () =>
+      messages.map((message) => ({
+        type: message.role,
+        content: message.content,
+        timestamp: message.timestamp || new Date().toISOString(),
+      })),
+    [messages]
+  );
+
+  const currentActivityEvents = useMemo(
+    () => (threadId ? activityEvents[threadId] ?? activityFeed : []),
+    [threadId, activityEvents, activityFeed]
+  );
+
+  const reportSections = useMemo(
+    () => buildSections(messages, threadId),
+    [messages, threadId]
+  );
+
+  const reportSources: ReportSource[] = useMemo(
+    () => buildSources(allReferenceUrls),
+    [allReferenceUrls]
+  );
+
+  const reportOverview = useMemo(
+    () =>
+      latestAssistantMessage?.content ||
+      (reportSections[0]?.content ?? "아직 생성된 리포트가 없습니다."),
+    [latestAssistantMessage, reportSections]
+  );
+
+  const reportDuration = useMemo(
+    () => computeDurationSeconds(currentActivityEvents),
+    [currentActivityEvents]
+  );
+
+  const reportStatus: "loading" | "completed" | "error" = useMemo(
+    () =>
+      isStreaming || isLoading
+        ? "loading"
+        : assistantMessages.length > 0
+        ? "completed"
+        : "loading",
+    [isStreaming, isLoading, assistantMessages.length]
+  );
+
+  const reportTitle = useMemo(
+    () => threads[threadId || ""]?.title || "AI Research Agent",
+    [threads, threadId]
+  );
+
+  const reportSubtitle = useMemo(
+    () =>
+      messages.find((msg) => msg.role === "user")?.content?.split("\n")[0]?.slice(0, 80) ||
+      "심층 분석 리포트",
+    [messages]
+  );
+
+  const reportData = useMemo(
+    () => ({
+      title: reportTitle,
+      subtitle: reportSubtitle,
+      status: reportStatus,
+      duration: reportDuration,
+      overview: reportOverview,
+      sections: reportSections,
+      sources: reportSources,
+    }),
+    [
+      reportTitle,
+      reportSubtitle,
+      reportStatus,
+      reportDuration,
+      reportOverview,
+      reportSections,
+      reportSources,
+    ]
+  );
+
+  // 스크롤 위치 관리: 새 메시지 추가 시 자동 스크롤
+  useEffect(() => {
+    if (!scrollContainerRef.current || !shouldAutoScrollRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+
+    // 사용자가 스크롤을 위로 올렸다면 자동 스크롤 비활성화
+    if (!isNearBottom && !isStreaming) {
+      shouldAutoScrollRef.current = false;
+      return;
+    }
+
+    // 스트리밍 중이거나 새 메시지가 추가되었을 때 자동 스크롤
+    if (isStreaming || isNearBottom) {
+      const timeoutId = setTimeout(() => {
+        if (scrollContainerRef.current && shouldAutoScrollRef.current) {
+          scrollContainerRef.current.scrollTo({
+            top: scrollContainerRef.current.scrollHeight,
+            behavior: isStreaming ? "smooth" : "auto",
+          });
+        }
+      }, 50);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [reportSections.length, isStreaming, assistantMessages.length]);
+
+  // 스크롤 이벤트 리스너: 사용자가 스크롤할 때 자동 스크롤 상태 업데이트
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+      shouldAutoScrollRef.current = isNearBottom;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // 스트리밍 시작 시 자동 스크롤 활성화
+  useEffect(() => {
+    if (isStreaming) {
+      shouldAutoScrollRef.current = true;
+    }
+  }, [isStreaming]);
+
+  const handleDeepResearch = useCallback(
+    (message: string) => {
+      if (!message.trim()) return;
+      const enriched = `[Deep Research] ${message.trim()}`;
+      void handleSendMessage(enriched);
+    },
+    [handleSendMessage]
+  );
 
   return (
     <div className="h-screen overflow-hidden flex bg-[var(--bg-root)] text-[var(--text-primary)]">
-      <Sidebar onNewThread={handleNewThreadClick} />
+      <Sidebar onNewThread={handleNewThreadClick} isLoadingThreads={isLoading && !serverThreadsLoaded} />
       <div className="flex-1 flex flex-col bg-transparent min-w-0 min-h-0">
-        <header className="border-b border-[var(--panel-border)] bg-[var(--panel-bg)] flex-shrink-0 shadow-sm">
+        <header className="border-b border-[var(--panel-border)] bg-[var(--panel-bg)] flex-shrink-0 shadow-sm backdrop-blur-xl bg-opacity-95">
           <div className="max-w-4xl mx-auto w-full px-8 py-6 flex items-center justify-between gap-4">
-            <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.5em] text-[var(--text-secondary)]">
+            <div className="space-y-2 fade-in">
+              <span className="text-xs uppercase tracking-[0.5em] text-[var(--text-secondary)] font-medium">
                 Research Agent
               </span>
-              <h1 className="text-[2.15rem] font-semibold text-[var(--text-primary)] tracking-tight">
+              <h1 className="text-[2.15rem] font-semibold text-[var(--text-primary)] tracking-tight gradient-text">
                 AI Research Agent
               </h1>
-              <p className="text-[15px] text-[var(--text-secondary)] leading-6">
+              <p className="text-[15px] text-[var(--text-secondary)] leading-6 font-light">
                 LangGraph 기반 심층 리서치를 돕는 정교한 워크스페이스
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center bg-[var(--panel-bg)] border border-[var(--panel-border)] rounded-full px-1 py-1">
-                {[
-                  { label: "Light", value: "light" as const },
-                  { label: "Dark", value: "dark" as const },
-                  { label: "System", value: "system" as const },
-                ].map(({ label, value }) => (
-                  <button
-                    key={value}
-                    onClick={() => setThemePreference(value)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                      themePreference === value
-                        ? "bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm"
-                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                    }`}
-                    aria-pressed={themePreference === value}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {mounted && (
+                <div className="flex items-center bg-[var(--panel-bg)] border border-[var(--panel-border)] rounded-full px-1 py-1 shadow-sm backdrop-blur-sm">
+                  {[
+                    { label: "Light", value: "light" as const },
+                    { label: "Dark", value: "dark" as const },
+                    { label: "System", value: "system" as const },
+                  ].map(({ label, value }) => {
+                    const isActive = themePreference === value;
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => setThemePreference(value)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                          isActive
+                            ? "bg-gradient-to-r from-[var(--accent-soft)] to-[var(--accent-soft)] text-[var(--accent)] shadow-md scale-105"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                        }`}
+                        aria-pressed={isActive ? "true" : "false"}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <button
                 onClick={() => setIsRightSidebarOpen((prev) => !prev)}
-                aria-label="Toggle insights"
-                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[var(--sidebar-border)] shadow-sm transition-colors ${
+                aria-label={isRightSidebarOpen ? "인사이트 패널 닫기" : "인사이트 패널 열기"}
+                aria-expanded={isRightSidebarOpen}
+                aria-controls="right-sidebar"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[var(--sidebar-border)] shadow-md transition-all hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 ${
                   isRightSidebarOpen
-                    ? "bg-[#f0f0f3] text-[var(--text-primary)] hover:bg-[#e4e4e9]"
-                    : "bg-white text-[var(--text-primary)] hover:bg-[#f0f0f3]"
+                    ? "bg-gradient-to-br from-[var(--accent-soft)] to-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30"
+                    : "bg-[var(--panel-bg)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 }`}
               >
-                {isRightSidebarOpen ? "−" : "+"}
+                <span className="text-lg font-light transition-transform duration-200" aria-hidden="true">{isRightSidebarOpen ? "−" : "+"}</span>
               </button>
             </div>
           </div>
@@ -820,8 +1047,11 @@ export default function Home() {
         <main className="flex-1 min-h-0 bg-[var(--bg-root)] flex flex-col overflow-hidden">
           {assistantMessages.length > 0 ? (
             <>
-              <div className="flex-1 min-h-0 overflow-y-auto px-12 md:px-20 lg:px-28 xl:px-36 pt-10 pb-32">
-                <ResearchReport data={reportData} />
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 min-h-0 overflow-y-auto px-12 md:px-20 lg:px-28 xl:px-36 pt-10 pb-32"
+              >
+                <ResearchReport data={reportData} isStreaming={isStreaming} />
               </div>
               <div className="flex-shrink-0 bg-[var(--bg-root)] px-6 md:px-12 lg:px-20 xl:px-28 pt-20 pb-24">
                 <div className="max-w-2xl mx-auto w-full">
@@ -829,18 +1059,19 @@ export default function Home() {
                     onSend={handleSendMessage}
                     onDeepResearch={handleDeepResearch}
                     disabled={isStreaming || isLoading}
+                    autoFocus={shouldAutoFocus}
                   />
                 </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="flex-1 flex flex-col items-center justify-center fade-in">
               <div className="mb-12 text-center px-4">
                 <div className="flex items-center justify-center gap-3 mb-4">
-                  <h2 className="text-5xl font-semibold text-[var(--text-primary)] tracking-tight">
+                  <h2 className="text-5xl font-semibold text-[var(--text-primary)] tracking-tight gradient-text">
                     연구개발AI팀
                   </h2>
-                  <span className="px-3 py-1 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)] uppercase tracking-wider">
+                  <span className="px-4 py-1.5 rounded-full border border-[var(--accent)]/40 bg-gradient-to-r from-[var(--accent-soft)] to-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)] uppercase tracking-wider shadow-md backdrop-blur-sm">
                     챗봇
                   </span>
                 </div>
@@ -850,6 +1081,7 @@ export default function Home() {
                   onSend={handleSendMessage}
                   onDeepResearch={handleDeepResearch}
                   disabled={isStreaming || isLoading}
+                  autoFocus={true}
                 />
               </div>
             </div>
@@ -857,7 +1089,12 @@ export default function Home() {
         </main>
       </div>
       {isRightSidebarOpen && (
-        <div className="flex-shrink-0 border-l border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] w-[260px] transition-all duration-200">
+        <div 
+          id="right-sidebar"
+          className="flex-shrink-0 border-l border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] w-[260px] transition-all duration-200"
+          role="complementary"
+          aria-label="인사이트 사이드바"
+        >
           <RightSidebar
             references={referenceLinks}
             activity={currentActivityEvents}

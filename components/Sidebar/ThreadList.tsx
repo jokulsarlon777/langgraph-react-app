@@ -8,26 +8,43 @@ import styles from "./ThreadList.module.css";
 interface ThreadListProps {
   selectedThreadId?: string | null;
   onSelectThread: (threadId: string) => void;
+  searchQuery?: string;
 }
 
 export default function ThreadList({
   selectedThreadId = null,
   onSelectThread,
+  searchQuery = "",
 }: ThreadListProps) {
   const { threads } = useThreadStore();
 
   const orderedThreads = useMemo(() => {
-    return Object.entries(threads)
+    let filtered = Object.entries(threads)
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => {
         const dateA = new Date(a.created_at ?? 0).getTime();
         const dateB = new Date(b.created_at ?? 0).getTime();
         return dateB - dateA;
       });
-  }, [threads]);
+
+    // 검색 쿼리가 있으면 필터링
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((thread) => {
+        const title = (thread.title || "").toLowerCase();
+        return title.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [threads, searchQuery]);
 
   if (orderedThreads.length === 0) {
-    return <p className={styles.threadEmpty}>대화 기록이 없습니다.</p>;
+    return (
+      <p className={styles.threadEmpty}>
+        {searchQuery.trim() ? "검색 결과가 없습니다." : "대화 기록이 없습니다."}
+      </p>
+    );
   }
 
   return (

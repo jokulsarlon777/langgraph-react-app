@@ -79,14 +79,19 @@ export default function RightSidebar({
           </div>
         </div>
 
-        <div className={styles.tabGroup}>
+        <div className={styles.tabGroup} role="tablist" aria-label="인사이트 탭">
           <button
             onClick={() => setActiveTab("sources")}
             className={`${styles.tabButton} ${
               activeTab === "sources" ? styles.tabButtonActive : ""
             }`}
+            role="tab"
+            aria-selected={activeTab === "sources"}
+            aria-controls="sources-panel"
+            id="sources-tab"
+            aria-label="소스 탭"
           >
-            <Link className={styles.tabIcon} />
+            <Link className={styles.tabIcon} aria-hidden="true" />
             Sources
           </button>
           <button
@@ -94,8 +99,13 @@ export default function RightSidebar({
             className={`${styles.tabButton} ${
               activeTab === "activity" ? styles.tabButtonActive : ""
             }`}
+            role="tab"
+            aria-selected={activeTab === "activity"}
+            aria-controls="activity-panel"
+            id="activity-tab"
+            aria-label="활동 탭"
           >
-            <History className={styles.tabIcon} />
+            <History className={styles.tabIcon} aria-hidden="true" />
             Activity
           </button>
         </div>
@@ -103,20 +113,26 @@ export default function RightSidebar({
 
       <div className={styles.body}>
         {activeTab === "sources" ? (
-          <section className={styles.section}>
+          <section 
+            className={styles.section}
+            role="tabpanel"
+            id="sources-panel"
+            aria-labelledby="sources-tab"
+          >
             <div className={styles.sectionLabel}>
               SOURCES ({formattedReferences.length})
             </div>
             {formattedReferences.length > 0 ? (
-              <ul className={styles.sourceList}>
+              <ul className={styles.sourceList} role="list">
                 {formattedReferences.map((ref) => (
-                  <li key={ref.url} className={styles.sourceItem}>
-                    <span className={styles.sourceDomain}>{ref.hostname || "link"}</span>
+                  <li key={ref.url} className={styles.sourceItem} role="listitem">
+                    <span className={styles.sourceDomain} aria-label="도메인">{ref.hostname || "link"}</span>
                     <a
                       href={ref.url}
                       target="_blank"
                       rel="noreferrer"
                       className={styles.sourceLink}
+                      aria-label={`${ref.hostname || "링크"} 열기 (새 탭)`}
                     >
                       {ref.display}
                     </a>
@@ -124,37 +140,50 @@ export default function RightSidebar({
                 ))}
               </ul>
             ) : (
-              <div className={styles.emptyCard}>
+              <div className={styles.emptyCard} role="status" aria-live="polite">
                 아직 수집된 레퍼런스 링크가 없습니다. AI 응답에 포함된 URL이 자동으로
                 표시됩니다.
               </div>
             )}
           </section>
         ) : (
-          <section className={styles.section}>
+          <section 
+            className={styles.section}
+            role="tabpanel"
+            id="activity-panel"
+            aria-labelledby="activity-tab"
+          >
             <div className={styles.sectionLabel}>Activity Timeline</div>
             {activityItems.length > 0 ? (
-              <div className={styles.activityList}>
+              <div className={styles.activityList} role="list">
                 {activityItems.map((item) => (
-                  <div key={item.id} className={styles.activityItem}>
+                  <div key={item.id} className={styles.activityItem} role="listitem">
                     <div className={styles.activityHeader}>
-                      <span>
+                      <span aria-label={`${item.label} 활동`}>
                         {item.icon} {item.label}
                       </span>
-                      <span className={styles.activityTime}>
+                      <time 
+                        className={styles.activityTime}
+                        dateTime={item.timestamp}
+                        aria-label={`활동 시간: ${new Date(item.timestamp).toLocaleTimeString("ko-KR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}`}
+                      >
                         {new Date(item.timestamp).toLocaleTimeString("ko-KR", {
                           hour: "2-digit",
                           minute: "2-digit",
                           second: "2-digit",
                         })}
-                      </span>
+                      </time>
                     </div>
                     <div className={styles.activityBody}>{item.preview || "(내용 없음)"}</div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className={styles.emptyCard}>
+              <div className={styles.emptyCard} role="status" aria-live="polite">
                 아직 대화가 없습니다. 메시지를 입력해 활동 기록을 확인해보세요.
               </div>
             )}

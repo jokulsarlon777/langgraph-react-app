@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import Card from "../shared/Card";
 import Divider from "../shared/Divider";
@@ -13,11 +13,14 @@ interface ReportSectionProps {
   index: number;
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ section, index }) => {
+const ReportSection = memo(function ReportSection({
+  section,
+  index,
+}: ReportSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <Card className={styles.sectionCard}>
+    <Card className={`${styles.sectionCard} fade-in`} style={{ animationDelay: `${index * 0.1}s` }}>
       <button
         type="button"
         className={styles.sectionHeader}
@@ -34,7 +37,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ section, index }) => {
       </button>
 
       {isExpanded && (
-        <>
+        <div className="fade-in">
           <Divider />
           <div className={styles.sectionMarkdown}>
             <ReactMarkdown>{section.content}</ReactMarkdown>
@@ -50,10 +53,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ section, index }) => {
               </div>
             </>
           )}
-        </>
+        </div>
       )}
     </Card>
   );
-};
+});
+
+ReportSection.displayName = "ReportSection";
 
 export default ReportSection;

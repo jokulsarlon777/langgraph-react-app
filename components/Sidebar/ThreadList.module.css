@@ -17,6 +17,8 @@
   color: var(--text-primary);
   transition: background-color var(--transition-fast), border-color var(--transition-fast),
     transform var(--transition-fast);
+  width: 100%;
+  cursor: pointer;
 }
 
 .threadItem:hover {
@@ -25,7 +27,7 @@
   transform: translateX(2px);
 }
 
-.active {
+.threadItem.active {
   background: rgba(59, 130, 246, 0.12);
   border-color: var(--color-accent-blue-light);
 }

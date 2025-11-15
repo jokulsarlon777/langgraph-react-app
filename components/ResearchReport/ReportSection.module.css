@@ -33,11 +33,18 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: var(--color-accent-blue-light);
+  background: linear-gradient(135deg, var(--color-accent-blue-light), rgba(61, 106, 255, 0.15));
   color: var(--color-accent-blue);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-sm);
+  box-shadow: 0 2px 8px rgba(61, 106, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.sectionHeader:hover .sectionNumber {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(61, 106, 255, 0.3);
 }
 
 .sectionTitle {
@@ -50,11 +57,25 @@
 .sectionToggle {
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
-  transition: transform var(--transition-base);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(61, 106, 255, 0.1);
+}
+
+.sectionHeader:hover .sectionToggle {
+  background: rgba(61, 106, 255, 0.2);
+  color: var(--color-accent-blue);
 }
 
 .open {
   transform: rotate(180deg);
+  background: rgba(61, 106, 255, 0.2);
+  color: var(--color-accent-blue);
 }
 
 .sectionMarkdown {

@@ -8,5 +8,5 @@ interface CardProps extends PropsWithChildren {
  }
  
  export default function Card({ children, className = "" }: CardProps) {
-   return <div className={`${styles.card} ${className}`.trim()}>{children}</div>;
+   return <div className={`${styles.card} ${className} card-hover`.trim()}>{children}</div>;
  }
